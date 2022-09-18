@@ -1,5 +1,7 @@
 pub mod fwht;
 pub mod h264;
+pub mod vp8;
+pub mod vp9;
 
 use log::error;
 use std::io;

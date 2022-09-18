@@ -15,6 +15,8 @@ bitflags = "1.2.1"
 thiserror = "1.0"
 anyhow = "1.0"
 log = "0.4.14"
+bytes = "1.1.0"
+bitreader = "0.3.6"
 
 # For example programs
 [dev-dependencies]

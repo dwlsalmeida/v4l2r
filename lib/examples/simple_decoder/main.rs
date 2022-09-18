@@ -12,7 +12,7 @@ use std::{
 use anyhow::ensure;
 use nix::sys::time::{TimeVal, TimeValLike};
 use v4l2r::{
-    decoder::{format::fwht::FwhtFrameParser, FormatChangedReply},
+    decoder::{format::{fwht::FwhtFrameParser, vp8::IvfReader, vp9::Vp9SuperframeParser}, FormatChangedReply},
     device::queue::{handles_provider::MmapProvider, FormatBuilder},
     memory::{MemoryType, MmapHandle},
     PlaneLayout,
@@ -38,6 +38,8 @@ use clap::{App, Arg};
 enum Codec {
     Fwht,
     H264,
+    Vp8,
+    Vp9,
 }
 
 fn main() {
@@ -83,6 +85,8 @@ fn main() {
     {
         "fwht" => Codec::Fwht,
         "h264" => Codec::H264,
+        "vp8" => Codec::Vp8,
+        "vp9" => Codec::Vp9,
         _ => panic!("Invalid input format specified"),
     };
 
@@ -171,6 +175,8 @@ fn main() {
             let pixel_format: PixelFormat = match codec {
                 Codec::Fwht => b"FWHT".into(),
                 Codec::H264 => b"H264".into(),
+                Codec::Vp8 => b"VP80".into(),
+                Codec::Vp9 => b"VP90".into(),
             };
             let format: Format = f
                 .set_pixelformat(pixel_format)
@@ -208,6 +214,14 @@ fn main() {
             H264FrameSplitter::new(stream)
                 .unwrap_or_else(|| panic!("No H.264 stream detected in {}", stream_path)),
         ) as Box<dyn StreamSplitter>,
+        Codec::Vp8 => Box::new(
+            IvfReader::new(stream)
+                .unwrap_or_else(|_| panic!("No VP8 stream detected in {}", stream_path)),
+        ) as Box<dyn StreamSplitter>,
+        Codec::Vp9 => Box::new(
+            Vp9SuperframeParser::new(stream)
+                .unwrap_or_else(|_| panic!("No VP9 stream detected in {}", stream_path)) ,
+        ) as Box<dyn StreamSplitter> ,
     };
 
     'mainloop: for (bitstream_id, frame) in parser.enumerate() {
