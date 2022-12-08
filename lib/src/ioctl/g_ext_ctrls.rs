@@ -1,3 +1,4 @@
+use std::convert::TryFrom;
 use std::os::unix::io::AsRawFd;
 use std::mem::{self, size_of};
 use thiserror::Error;
@@ -149,6 +150,65 @@ pub struct FwhtParams {
     pub quantization: Quantization,
 }
 
+// Notice that this is private
+//
+// IMHO better to have size differences than to allocate dynamic memory on
+// *every* call. Otherwise the inner type can be boxed, but still it will *not*
+// need into/from_raw(), in that case you can cast the box to a pointer.
+#[allow(clippy::large_enum_variant)]
+enum CompoundControl {
+    H264Sps(bindings::v4l2_ctrl_h264_sps),
+    H264Pps(bindings::v4l2_ctrl_h264_pps),
+    H264ScalingMatrix(bindings::v4l2_ctrl_h264_scaling_matrix),
+    H264PredWeights(bindings::v4l2_ctrl_h264_pred_weights),
+    H264SliceParams(bindings::v4l2_ctrl_h264_slice_params),
+    H264DecodeParams(bindings::v4l2_ctrl_h264_decode_params),
+    FwhtParams(bindings::v4l2_ctrl_fwht_params),
+}
+
+impl CompoundControl {
+    fn size(&self) -> usize {
+        match self {
+            CompoundControl::H264Sps(_) => todo!(),
+            CompoundControl::H264Pps(_) => todo!(),
+            CompoundControl::H264ScalingMatrix(_) => todo!(),
+            CompoundControl::H264PredWeights(_) => todo!(),
+            CompoundControl::H264SliceParams(_) => todo!(),
+            CompoundControl::H264DecodeParams(_) => todo!(),
+            CompoundControl::FwhtParams(inner) => std::mem::size_of_val(inner),
+        }
+    }
+
+    fn as_mut_ptr(&mut self) -> *mut std::ffi::c_void {
+        match self {
+            CompoundControl::H264Sps(_) => todo!(),
+            CompoundControl::H264Pps(_) => todo!(),
+            CompoundControl::H264ScalingMatrix(_) => todo!(),
+            CompoundControl::H264PredWeights(_) => todo!(),
+            CompoundControl::H264SliceParams(_) => todo!(),
+            CompoundControl::H264DecodeParams(_) => todo!(),
+            CompoundControl::FwhtParams(inner) => inner as *mut _ as *mut std::ffi::c_void,
+        }
+    }
+}
+
+impl TryFrom<ExtControlKind> for CompoundControl {
+    type Error = ExtControlError;
+
+    fn try_from(value: ExtControlKind) -> Result<Self, Self::Error> {
+        match value {
+            ExtControlKind::H264DecodeMode | ExtControlKind::H264StartCode => Err(ExtControlError::NotACompoundControlError),
+            ExtControlKind::H264Sps => todo!(),
+            ExtControlKind::H264Pps => todo!(),
+            ExtControlKind::H264ScalingMatrix => todo!(),
+            ExtControlKind::H264PredWeights => todo!(),
+            ExtControlKind::H264SliceParams => todo!(),
+            ExtControlKind::H264DecodeParams => todo!(),
+            ExtControlKind::FwhtParams => Ok(CompoundControl::FwhtParams(bindings::v4l2_ctrl_fwht_params { .. unsafe {mem::zeroed()}})),
+        }
+    }
+}
+
 pub enum ExtControl {
     H264DecodeMode,
     H264StartCode,
@@ -161,34 +221,30 @@ pub enum ExtControl {
     FwhtParams(FwhtParams),
 }
 
-impl From<(ExtControlKind, &bindings::v4l2_ext_control)> for ExtControl {
-    fn from((ctrl_kind, ctrl): (ExtControlKind, &bindings::v4l2_ext_control)) -> Self {
-        match ctrl_kind {
-            ExtControlKind::H264DecodeMode => todo!(),
-            ExtControlKind::H264StartCode => todo!(),
-            ExtControlKind::H264Sps => todo!(),
-            ExtControlKind::H264Pps => todo!(),
-            ExtControlKind::H264ScalingMatrix => todo!(),
-            ExtControlKind::H264PredWeights => todo!(),
-            ExtControlKind::H264SliceParams => todo!(),
-            ExtControlKind::H264DecodeParams => todo!(),
-            ExtControlKind::FwhtParams =>
+impl From<CompoundControl> for ExtControl {
+    fn from(ctrl: CompoundControl) -> Self {
+        match ctrl {
+            CompoundControl::H264Sps(_) => todo!(),
+            CompoundControl::H264Pps(_) => todo!(),
+            CompoundControl::H264ScalingMatrix(_) => todo!(),
+            CompoundControl::H264PredWeights(_) => todo!(),
+            CompoundControl::H264SliceParams(_) => todo!(),
+            CompoundControl::H264DecodeParams(_) => todo!(),
+            CompoundControl::FwhtParams(inner) => {
                 ExtControl::FwhtParams(
-                    unsafe {
-                        let ptr = ctrl.__bindgen_anon_1.p_fwht_params;
-                        FwhtParams {
-                            backward_ref_ts: (*ptr).backward_ref_ts,
-                            version: (*ptr).version,
-                            width: (*ptr).width,
-                            height: (*ptr).height,
-                            flags: (*ptr).flags,
-                            colorspace: Colorspace::from((*ptr).colorspace),
-                            xfer_func: XferFunc::from((*ptr).xfer_func),
-                            ycbcr_enc: YCbCrEncoding::from((*ptr).ycbcr_enc),
-                            quantization: Quantization::from((*ptr).quantization),
-                        }
-                    }
-                ),
+                FwhtParams {
+                    backward_ref_ts: inner.backward_ref_ts,
+                    version: inner.version,
+                    width: inner.width,
+                    height: inner.height,
+                    flags: inner.height,
+                    colorspace: Colorspace::from(inner.colorspace),
+                    xfer_func: XferFunc::from(inner.xfer_func),
+                    ycbcr_enc: YCbCrEncoding::from(inner.ycbcr_enc),
+                    quantization: Quantization::from(inner.quantization),
+                }
+            )
+            }
         }
     }
 }
@@ -204,20 +260,8 @@ mod ioctl {
 pub enum ExtControlError {
     #[error("Unexpected ioctl error: {0}")]
     IoctlError(nix::Error),
-}
-
-fn free_ctrl_data(ctrl_kind: ExtControlKind, ctrl: &bindings::v4l2_ext_control) {
-    match ctrl_kind {
-        ExtControlKind::H264DecodeMode => todo!(),
-        ExtControlKind::H264StartCode => todo!(),
-        ExtControlKind::H264Sps => todo!(),
-        ExtControlKind::H264Pps => todo!(),
-        ExtControlKind::H264ScalingMatrix => todo!(),
-        ExtControlKind::H264PredWeights => todo!(),
-        ExtControlKind::H264SliceParams => todo!(),
-        ExtControlKind::H264DecodeParams => todo!(),
-        ExtControlKind::FwhtParams => unsafe { drop(Box::from_raw(ctrl.__bindgen_anon_1.p_fwht_params)); },
-    }
+    #[error("This control is not a compound control")]
+    NotACompoundControlError,
 }
 
 // Get a single extended control
@@ -239,39 +283,18 @@ pub fn g_ext_ctrl<F: AsRawFd>(
         .. unsafe { mem::zeroed() }
     };
 
-    match ctrl_kind {
-        ExtControlKind::H264DecodeMode => todo!(),
-        ExtControlKind::H264StartCode => todo!(),
-        ExtControlKind::H264Sps => todo!(),
-        ExtControlKind::H264Pps => todo!(),
-        ExtControlKind::H264ScalingMatrix => todo!(),
-        ExtControlKind::H264PredWeights => todo!(),
-        ExtControlKind::H264SliceParams => todo!(),
-        ExtControlKind::H264DecodeParams => todo!(),
-        ExtControlKind::FwhtParams =>  {
-            let fwht_params = Box::new(
-                bindings::v4l2_ctrl_fwht_params { .. unsafe { mem::zeroed() } }
-            );
-            control.__bindgen_anon_1.p_fwht_params = Box::into_raw(fwht_params);
-            control.size = size_of::<bindings::v4l2_ctrl_fwht_params>() as u32;
-        },
-    };
+    let mut compound_ctrl = CompoundControl::try_from(ctrl_kind)?;
 
     control.id = ctrl_kind as u32;
+    control.size = compound_ctrl.size() as u32;
+    control.__bindgen_anon_1.ptr = compound_ctrl.as_mut_ptr();
 
     controls.__bindgen_anon_1.which = bindings::V4L2_CTRL_WHICH_CUR_VAL;
     controls.count = 1;
     controls.controls = &mut control;
 
     match unsafe { ioctl::vidioc_g_ext_ctrls(fd.as_raw_fd(), &mut controls) } {
-        Ok(_) => {
-            let ret = Ok(ExtControl::from((ctrl_kind, &control)));
-            free_ctrl_data(ctrl_kind, &control);
-            ret
-        },
-        Err(e) => {
-            free_ctrl_data(ctrl_kind, &control);
-            Err(ExtControlError::IoctlError(e))
-        },
+        Ok(_) => Ok(ExtControl::from(compound_ctrl)),
+        Err(e) => Err(ExtControlError::IoctlError(e)),
     }
 }
