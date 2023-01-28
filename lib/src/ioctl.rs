@@ -21,6 +21,7 @@ mod querycap;
 mod reqbufs;
 mod streamon;
 mod subscribe_event;
+mod framesizes;
 
 pub use decoder_cmd::*;
 pub use dqbuf::*;
@@ -36,6 +37,7 @@ pub use querycap::*;
 pub use reqbufs::*;
 pub use streamon::*;
 pub use subscribe_event::*;
+pub use framesizes::*;
 
 use crate::bindings;
 use crate::QueueType;
